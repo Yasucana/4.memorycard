@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Memory Cards</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+        }
+        .sidebar {
+            width: 200px;
+            margin-right: 20px;
+            text-align: center;
+        }
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #333;
+        }
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(4, 100px);
+            gap: 10px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .card {
+            width: 100px;
+            height: 100px;
+            background-color: #3498db;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+        .card.flipped {
+            background-color: #2ecc71;
+            font-size: 40px;
+            transform: rotateY(180deg);
+        }
+        .card.matched {
+            background-color: #27ae60;
+            cursor: default;
+        }
+        #message {
+            margin-top: 20px;
+            font-size: 24px;
+            color: #e74c3c;
+        }
+        #score, #high-scores {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+        #ne-image {
+            max-width: 200px;
+            margin-top: 20px;
+        }
+        #continue-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #continue-btn:hover {
+            background-color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Score</h2>
+        <div id="score">Score: 0</div>
+        <h2>High Scores</h2>
+        <div id="high-scores"></div>
+    </div>
+    <div class="main">
+        <h1>Memory Cards</h1>
+        <div class="game-board" id="gameBoard"></div>
+        <div id="message"></div>
+        <img id="ne-image" src="ne.jpg" style="display: none;">
+        <button id="continue-btn" style="display: none;">Continue</button>
+    </div>
+
+    <script>
+        const emojis = ['🍎', '🍎', '🍊', '🍊', '🍇', '🍇', '🍉', '🍉', '🍒', '🍒', '🍍', '🍍', '🥝', '🥝', '🍓', '🍓'];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let score = 0;
+        let streak = 0;
+        let cardFlipCounts = {};
+        let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+
+        // Update score display
+        function updateScore() {
+            document.getElementById('score').textContent = `Score: ${score}`;
+        }
+
+        // Update high scores
+        function updateHighScores() {
+            highScores.push(score);
+            highScores.sort((a, b) => b - a);
+            highScores = highScores.slice(0, 3);
+            localStorage.setItem('highScores', JSON.stringify(highScores));
+            document.getElementById('high-scores').innerHTML = highScores
+                .map((s, i) => `Rank ${i + 1}: ${s}`)
+                .join('<br>');
+        }
+
+        // Shuffle array
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Create game board
+        function createBoard() {
+            const gameBoard = document.getElementById('gameBoard');
+            gameBoard.innerHTML = '';
+            const shuffledEmojis = shuffle([...emojis]);
+            shuffledEmojis.forEach((emoji, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.emoji = emoji;
+                card.dataset.id = index;
+                card.addEventListener('click', flipCard);
+                gameBoard.appendChild(card);
+            });
+        }
+
+        // Flip card
+        function flipCard() {
+            if (flippedCards.length < 2 && !this.classList.contains('flipped') && !this.classList.contains('matched')) {
+                this.classList.add('flipped');
+                this.textContent = this.dataset.emoji;
+                flippedCards.push(this);
+                cardFlipCounts[this.dataset.id] = (cardFlipCounts[this.dataset.id] || 0) + 1;
+
+                if (flippedCards.length === 2) {
+                    checkMatch();
+                }
+            }
+        }
+
+        // Check for match
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.dataset.emoji === card2.dataset.emoji) {
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                streak++;
+                score += streak > 1 ? 6 : 4;
+                matchedPairs++;
+                flippedCards = [];
+                updateScore();
+                if (matchedPairs === emojis.length / 2) {
+                    document.getElementById('message').textContent = 'Congratulations! You Win!';
+                    updateHighScores();
+                    const highestScore = highScores[0] || 0;
+                    if (score < highestScore) {
+                        document.getElementById('ne-image').style.display = 'block';
+                        document.getElementById('continue-btn').style.display = 'block';
+                    }
+                }
+            } else {
+                const flippedMoreThanOnce = [card1, card2].some(card => cardFlipCounts[card.dataset.id] > 1);
+                if (flippedMoreThanOnce) score -= 2;
+                score -= 1;
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    card1.textContent = '';
+                    card2.textContent = '';
+                    flippedCards = [];
+                }, 1000);
+                streak = 0;
+                updateScore();
+            }
+        }
+
+        // Reset game
+        function resetGame() {
+            flippedCards = [];
+            matchedPairs = 0;
+            score = 0;
+            streak = 0;
+            cardFlipCounts = {};
+            document.getElementById('message').textContent = '';
+            document.getElementById('ne-image').style.display = 'none';
+            document.getElementById('continue-btn').style.display = 'none';
+            updateScore();
+            createBoard();
+        }
+
+        // Initialize game
+        document.getElementById('continue-btn').addEventListener('click', resetGame);
+        updateHighScores();
+        updateScore();
+        createBoard();
+    </script>
+</body>
+</html>
